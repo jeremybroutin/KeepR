@@ -7,6 +7,7 @@
 //
 
 import UIKit
+import Firebase
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -16,6 +17,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
 	func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplicationLaunchOptionsKey: Any]?) -> Bool {
 		// Override point for customization after application launch.
+		FIRApp.configure()
+		// GADMobileAds.configure(withApplicationID: "ca-app-pub-9663491524442751~1938270624")
+		// test id: ca-app-pub-3940256099942544~1458002511
+		GADMobileAds.configure(withApplicationID: "ca-app-pub-3940256099942544~1458002511")
+		
+		//FIRCrashMessage("Manual crash")
+		//fatalError()
 		return true
 	}
 
