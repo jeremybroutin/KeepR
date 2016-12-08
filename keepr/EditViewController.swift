@@ -16,6 +16,7 @@ class EditViewController: UIViewController, UITextFieldDelegate {
 	var storageRef: FIRStorageReference!
 	
 	var image: UIImage!
+	var delegate: SnackBarDelegate!
 	var receipt: Receipt!
 	var isNew: Bool = true
 	
@@ -26,7 +27,11 @@ class EditViewController: UIViewController, UITextFieldDelegate {
 	@IBOutlet var dateLabel: UILabel!
 	@IBOutlet var userInfoLabel: UILabel!
 	@IBOutlet var saveButton: UIBarButtonItem!
+	@IBOutlet var snackLabel: UILabel!
 	
+	@IBOutlet var spaceSnackToView: NSLayoutConstraint!
+	@IBOutlet var BottomToView: NSLayoutConstraint!
+	@IBOutlet var BottomToSnack: NSLayoutConstraint!
 	// MARK: - App Life Cycle
 	
 	override func viewDidLoad() {
@@ -79,6 +84,9 @@ class EditViewController: UIViewController, UITextFieldDelegate {
 		// Notifications for keyboard display
 		NotificationCenter.default.addObserver(self, selector: #selector(EditViewController.keyboardWillShow), name: NSNotification.Name.UIKeyboardWillShow, object: nil)
 		NotificationCenter.default.addObserver(self, selector: #selector(EditViewController.keyboardWillHide), name: NSNotification.Name.UIKeyboardWillHide, object: nil)
+		
+		// Hide snackbar
+		self.delegate.updateConstraintsForSnackBar(shouldShow: false, spacingCons: spaceSnackToView, snackToBottom: BottomToSnack, viewToBottom: BottomToView)
 	}
 	
 	// MARK: - IBActions
@@ -142,13 +150,12 @@ class EditViewController: UIViewController, UITextFieldDelegate {
 	func downloadImage(userStorageRef: FIRStorageReference) {
 		userStorageRef.data(withMaxSize: 2*1024*1024) { (data, error) -> Void in
 			if let error = error {
-				self.userInfoLabel.text = error.localizedDescription
-				self.userInfoLabel.isHidden = false
+				self.showSnackMessage(with: error.localizedDescription, inLabel: self.snackLabel)
 			} else {
 				if let data = data {
 					self.imageView.image = UIImage(data: data)
 				} else {
-					print("no image data error")
+					self.showSnackMessage(with: "No image data found.", inLabel: self.snackLabel)
 				}
 			}
 		}
@@ -162,13 +169,11 @@ class EditViewController: UIViewController, UITextFieldDelegate {
 		let photoURL = FIRAuth.auth()!.currentUser!.uid + "/\(Int(Date.timeIntervalSinceReferenceDate)).jpg"
 		
 		guard let title = titleTxtField.text, title != titleTxtField.placeholder && !title.isEmpty else {
-			userInfoLabel.text = "Please add a title to your receipt."
-			userInfoLabel.isHidden = false
+			delegate.showSnackMessage(with: "Please add a title to your receipt.", inLabel: snackLabel)
 			return
 		}
 		guard let value = Double(valueTxtField.text!) else {
-			userInfoLabel.text = "Please add a value to your receipt."
-			userInfoLabel.isHidden = false
+			delegate.showSnackMessage(with: "Please add a value to your receipt.", inLabel: snackLabel)
 			return
 		}
 		guard let date = dateLabel.text else { return }
@@ -182,8 +187,10 @@ class EditViewController: UIViewController, UITextFieldDelegate {
 			.put(imageData, metadata: metadata) { (metadata, error) in
 				if let error = error {
 					print("Error uploading: \(error)")
-					self.userInfoLabel.text = "Upload Failed"
-					FIRAnalytics.logEvent(withName: "store_receipt_failed", parameters: nil)
+					self.showSnackMessage(with: "Upload to database failed.", inLabel: self.snackLabel)
+					DispatchQueue.main.async {
+						FIRAnalytics.logEvent(withName: "store_receipt_failed", parameters: nil)
+					}
 					return
 				}
 				
@@ -199,7 +206,10 @@ class EditViewController: UIViewController, UITextFieldDelegate {
 				]
 				let childUpdates = ["/users/\(userID!)/\(key)/": receipt]
 				self.ref.updateChildValues(childUpdates)
-				FIRAnalytics.logEvent(withName: "store_receipt_success", parameters: nil)
+				
+				DispatchQueue.main.async {
+					FIRAnalytics.logEvent(withName: "store_receipt_success", parameters: nil)
+				}
 		}
 	}
 	
@@ -208,13 +218,11 @@ class EditViewController: UIViewController, UITextFieldDelegate {
 		let key = receipt.key
 		
 		guard let title = titleTxtField.text, title != titleTxtField.placeholder && !title.isEmpty else {
-			userInfoLabel.text = "Please add a title to your receipt."
-			userInfoLabel.isHidden = false
+			showSnackMessage(with: "Please add a title to your receipt.", inLabel: snackLabel)
 			return
 		}
 		guard let value = Double(valueTxtField.text!) else {
-			userInfoLabel.text = "Please add a value to your receipt."
-			userInfoLabel.isHidden = false
+			showSnackMessage(with: "Please add a value to your receipt.", inLabel: snackLabel)
 			return
 		}
 		guard let date = dateLabel.text else { return }
@@ -228,5 +236,24 @@ class EditViewController: UIViewController, UITextFieldDelegate {
 		let childUpdates = ["/users/\(userID!)/\(key)/": updatedReceipt]
 		self.ref.updateChildValues(childUpdates)
 		FIRAnalytics.logEvent(withName: "update_receipt", parameters: nil)
+	}
+	
+	// MARK: - SnackBar
+	
+	func showSnackMessage(with message: String, inLabel label: UILabel) {
+		// Update snack content
+		label.text = message
+		
+		// Display Snack
+		view.layoutIfNeeded()
+		UIView.animate(withDuration: 0.5, delay: 0.5, options: [], animations: {
+			self.delegate.updateConstraintsForSnackBar(shouldShow: true, spacingCons: self.spaceSnackToView, snackToBottom: self.BottomToSnack, viewToBottom: self.BottomToView)
+			self.view.layoutIfNeeded()
+		}) { (finished) in
+			UIView.animate(withDuration: 0.5, delay: 1.5, options: [], animations: {
+				self.delegate.updateConstraintsForSnackBar(shouldShow: false, spacingCons: self.spaceSnackToView, snackToBottom: self.BottomToSnack, viewToBottom: self.BottomToView)
+				self.view.layoutIfNeeded()
+			}, completion: nil)
+		}
 	}
 }

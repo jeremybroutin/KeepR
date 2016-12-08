@@ -22,8 +22,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 		// test id: ca-app-pub-3940256099942544~1458002511
 		GADMobileAds.configure(withApplicationID: "ca-app-pub-3940256099942544~1458002511")
 		
-		//FIRCrashMessage("Manual crash")
-		//fatalError()
+		// FIRCrashMessage("Manual crash")
+		// fatalError()
 		return true
 	}
 

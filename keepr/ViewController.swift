@@ -14,6 +14,11 @@ protocol RegionDelegate {
 	func changeColors()
 }
 
+protocol SnackBarDelegate {
+	func updateConstraintsForSnackBar(shouldShow show: Bool, spacingCons: NSLayoutConstraint, snackToBottom: NSLayoutConstraint, viewToBottom: NSLayoutConstraint)
+	func showSnackMessage(with message: String, inLabel label: UILabel)
+}
+
 class ViewController: UIViewController, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
 
 	var ref: FIRDatabaseReference!
@@ -54,14 +59,7 @@ class ViewController: UIViewController, UIImagePickerControllerDelegate, UINavig
 		if FIRAuth.auth()?.currentUser == nil {
 			FIRAuth.auth()?.signInAnonymously(completion: { (user, error) in
 				if let error = error {
-					self.infoLabel.text = error.localizedDescription
-					UIView.animate(withDuration: 2, delay: 0, options: .curveEaseIn, animations: {
-						self.infoLabel.alpha = 1
-					}, completion: { (_) in
-						self.infoLabel.alpha = 0
-					})
-				} else {
-					self.infoLabel.text = ""
+					self.showSnackMessage(with: error.localizedDescription, inLabel: self.snackLabel)
 				}
 			})
 		}
@@ -81,7 +79,7 @@ class ViewController: UIViewController, UIImagePickerControllerDelegate, UINavig
 				newReceipts.append(receipt)
 			}
 			
-			self.showSnackMessage(with: "Receipts list updated.")
+			self.showSnackMessage(with: "Receipts list updated.", inLabel: self.snackLabel)
 			
 			self.receipts = newReceipts
 			self.tableView.reloadData()
@@ -96,39 +94,9 @@ class ViewController: UIViewController, UIImagePickerControllerDelegate, UINavig
 		addFloatingButton.layer.shadowOffset = CGSize(width: 0, height: 3)
 		
 		// Hide Snack bar
-		updateConstraintsForSnackBar(shouldShow: false)
+		updateConstraintsForSnackBar(shouldShow: false, spacingCons: spacingSnackButton, snackToBottom: bottomToLayoutSnack, viewToBottom: bottomToLayoutButton)
 	}
 	
-	func showSnackMessage(with message: String) {
-		// Update snack content
-		snackLabel.text = message
-		
-		// Display Snack
-		view.layoutIfNeeded()
-		UIView.animate(withDuration: 0.5, delay: 0.5, options: [], animations: {
-			self.updateConstraintsForSnackBar(shouldShow: true)
-			self.view.layoutIfNeeded()
-		}) { (finished) in
-			UIView.animate(withDuration: 0.5, delay: 2, options: [], animations: {
-				self.updateConstraintsForSnackBar(shouldShow: false)
-				self.view.layoutIfNeeded()
-			}, completion: nil)
-		}
-	}
-	
-	func updateConstraintsForSnackBar(shouldShow show: Bool) {
-		if show {
-			spacingSnackButton.constant = 10
-			spacingSnackButton.priority = UILayoutPriorityDefaultHigh+1
-			bottomToLayoutSnack.priority = UILayoutPriorityDefaultHigh+2
-			bottomToLayoutButton.constant = 50
-		} else {
-			spacingSnackButton.constant = view.frame.size.height
-			spacingSnackButton.priority = UILayoutPriorityDefaultHigh-1
-			bottomToLayoutSnack.priority = UILayoutPriorityDefaultHigh-2
-			bottomToLayoutButton.constant = 10
-		}
-	}
 
 	@IBAction func add(_ sender: UIButton) {
 		let picker = UIImagePickerController()
@@ -155,6 +123,7 @@ class ViewController: UIViewController, UIImagePickerControllerDelegate, UINavig
 		guard let image = info[UIImagePickerControllerOriginalImage] as? UIImage else { return }
 		let vc = storyboard?.instantiateViewController(withIdentifier: "editVC") as! EditViewController
 		vc.image = image
+		vc.delegate = self
 		navigationController?.pushViewController(vc, animated: true)
 	}
 
@@ -164,6 +133,7 @@ extension ViewController: UITableViewDelegate {
 	func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
 		let vc = storyboard?.instantiateViewController(withIdentifier: "editVC") as! EditViewController
 		vc.receipt = receipts[indexPath.row]
+		vc.delegate = self
 		navigationController?.pushViewController(vc, animated: true)
 		tableView.deselectRow(at: indexPath, animated: true)
 	}
@@ -200,7 +170,7 @@ extension ViewController: UITableViewDataSource {
 
 extension ViewController: RegionDelegate {
 	func fetchConfig(){
-		if remoteConfig[navBarColorConfigKey].stringValue == "yellow" {
+		/**if remoteConfig[navBarColorConfigKey].stringValue == "yellow" {
 			navigationController?.navigationBar.barTintColor = yellowColor
 			addFloatingButton.setImage(UIImage(named:"addButtonYellow"), for: .normal)
 			snackCloseButton.tintColor = yellowColor
@@ -214,7 +184,8 @@ extension ViewController: RegionDelegate {
 			navigationController?.navigationBar.barTintColor = purpleColor
 			addFloatingButton.setImage(UIImage(named:"addButtonPurple"), for: .normal)
 			snackCloseButton.tintColor = purpleColor
-		}
+		}**/
+		
 		var expirationDuration = 3600
 		if remoteConfig.configSettings.isDeveloperModeEnabled {
 			expirationDuration = 0
@@ -223,7 +194,7 @@ extension ViewController: RegionDelegate {
 			if status == .success {
 				self.remoteConfig.activateFetched()
 			} else {
-				self.showSnackMessage(with: error!.localizedDescription)
+				self.showSnackMessage(with: error!.localizedDescription, inLabel: self.snackLabel)
 				
 			}
 			self.changeColors()
@@ -247,6 +218,45 @@ extension ViewController: RegionDelegate {
 			navigationController?.navigationBar.barTintColor = purpleColor
 			addFloatingButton.setImage(UIImage(named:"addButtonPurple"), for: .normal)
 			snackCloseButton.tintColor = purpleColor
+		}
+	}
+}
+
+extension ViewController: SnackBarDelegate {
+	func showSnackMessage(with message: String, inLabel label: UILabel) {
+		// Update snack content
+		label.text = message
+		
+		// Display Snack
+		view.layoutIfNeeded()
+		UIView.animate(withDuration: 0.5, delay: 0.5, options: [], animations: {
+			self.updateConstraintsForSnackBar(shouldShow: true, spacingCons: self.spacingSnackButton, snackToBottom: self.bottomToLayoutSnack, viewToBottom: self.bottomToLayoutButton)
+			self.view.layoutIfNeeded()
+		}) { (finished) in
+			UIView.animate(withDuration: 0.5, delay: 2, options: [], animations: {
+				self.updateConstraintsForSnackBar(shouldShow: false, spacingCons: self.spacingSnackButton, snackToBottom: self.bottomToLayoutSnack, viewToBottom: self.bottomToLayoutButton)
+				self.view.layoutIfNeeded()
+			}, completion: nil)
+		}
+	}
+	
+	func updateConstraintsForSnackBar(shouldShow show: Bool, spacingCons: NSLayoutConstraint, snackToBottom: NSLayoutConstraint, viewToBottom: NSLayoutConstraint) {
+		if show {
+			spacingCons.constant = 10
+			spacingCons.priority = UILayoutPriorityDefaultHigh+1
+			snackToBottom.priority = UILayoutPriorityDefaultHigh+2
+			viewToBottom.constant = 50
+		} else {
+			spacingCons.constant = view.frame.size.height
+			spacingCons.priority = UILayoutPriorityDefaultHigh-1
+			snackToBottom.priority = UILayoutPriorityDefaultHigh-2
+			
+			if viewToBottom.identifier == "toolbar" {
+				viewToBottom.constant = 0
+			} else {
+				viewToBottom.constant = 10
+			}
+			
 		}
 	}
 }
