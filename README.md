@@ -4,5 +4,5 @@ KeepR leverages Firebase to safely store everything online!
 Don't loose any receipt anymore!  
 Even if you wipe your phone photos!
 
-
-![Alt text](/IMG_0058.PNG?raw=true "Home screenshot")
+### Screenshot(s)
+<img src="https://github.com/jeremybroutin/KeepR/blob/master/IMG_0058.PNG" width="200px">
